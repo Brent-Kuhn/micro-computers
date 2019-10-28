@@ -15,14 +15,12 @@ start:
 	; Set DDRB to output
 	OUT DDRB, R16
 	LDI R17, $FF
-	LDI R16, 0b00001000
 
 LR:
 	; Read from PORTD
-	IN  R20, PIND
-	SUB R20, R16
-	BREQ LO
-	RJMP LR
+	SBIC PIND, 4	
+	RJMP LO		;If PD4 is high, go to LO
+	RJMP LR		;Else check again
 
 LO:
 	; Send out to PORTB
