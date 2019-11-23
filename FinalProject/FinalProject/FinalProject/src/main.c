@@ -35,62 +35,98 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
-void delay_us(unsigned int);
-void to_wire(int, int, int, int, int, int, int*);
+#define SET_HIGH(port, pin) port |= (1<<pin);
+#define SET_LOW(port, pin) port &= ~(1<<pin);
+
+void delay_ms(unsigned int);
 void monitor_buttons(void);
 void blink(void);
+void spi_out(uint16_t);
+void init_LED(void);
 
-#define SELECT PINB0
-#define UP PINB1
-#define DOWN PINB2
-#define LEFT PINB3
-#define RIGHT PINB4
-
-// Buffers used for transmitting data to the board
-int buff0[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int buff1[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int buff2[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int buff3[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int buff4[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int buff5[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int buff6[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int buff7[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+// Needs to be re-organized according to circuit
+#define SELECT PIND2
+#define UP PIND6
+#define DOWN PIND5
+#define LEFT PIND3
+#define RIGHT PIND4
+#define CLK PORTB5
+#define CS PORTB2
+#define MOSI PORTB3
 
 // Use position to keep current position from 0 to 7 x and y
 // This will allow me to keep the state of the pointer
 // XOR with 1 using buff0-buff7 will toggle the current location
 int position[2] = {0, 0};
 
+uint16_t row1 = 0x0800;
+uint16_t row2 = 0x0700;
+uint16_t row3 = 0x0600;
+uint16_t row4 = 0x0500;
+uint16_t row5 = 0x0400;
+uint16_t row6 = 0x0300;
+uint16_t row7 = 0x0200;
+uint16_t row8 = 0x0100;
+
 int main (void)
 {
-	DDRD |= (0b111<<2); // Set DDRD 2, 3, and 4 as outputs to the LCD
-	DDRB &= ~(0b11111); // Set DDRB 0, 1, 2, 3, and 4 as inputs for the buttons
-	int buff[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
-
 	//board_init(); // do I even need this?
-	to_wire(PORTD, PORTD4, PORTD, PORTD2, PORTD, PORTD3, buff);
+	
+	//PORTD is the button register
+	SET_LOW(DDRD, SELECT);
+	SET_LOW(DDRD, UP);
+	SET_LOW(DDRD, DOWN);
+	SET_LOW(DDRD, LEFT);
+	SET_LOW(DDRD, RIGHT);
+	
+	init_LED();
+	
+	// Send test data for now
+	//spi_out(0x0FFF);
+	spi_out(row8 | 0x1);
 
 	while(1){
 		monitor_buttons();
 	}
 }
 
-void delay_us(unsigned int d) {
-	_delay_us(d);
+void init_LED(void) {
+	//PORTB is the SPI port
+	//DDRB = 0xFF; // Turn DDRB as output
+	// Make CLK, MOSI, and CS outputs
+	SET_HIGH(DDRB, CLK);
+	SET_HIGH(DDRB, MOSI);
+	SET_HIGH(DDRB, CS);
+	
+	//Enable SPI as master
+	SPCR = (1<<SPE)|(1<<MSTR)|(1<<SPR0);
+	
+	spi_out(0x0900); // Disable the decoding
+	spi_out(0x0B07); // Scan the segments
+	
+	// Clear each row by sending 0x0r00 where r=row index
+	for(uint16_t i = row8; i <= row1; i += 0x0100) {
+		spi_out(i);
+	}
+	
+	// Remove the device from shutdown mode
+	spi_out(0x0C01);
+	
+	delay_ms(1);
 }
 
-void to_wire(int DATAPORT, int DATA, int CLKPORT, int CLK, int CSPORT, int CS, int* buffer) {
-	for (int byte = 15; byte >= 0;byte--) {
-		int bit = buffer[byte];
-		if(bit == 1) {
-			DATAPORT |= (1<<DATA);
-		} else {
-			DATAPORT &= ~(1<<DATA);
-		}
-		CLKPORT |= (1<<CLK);
-		delay_us(1);
-		CLKPORT &= ~(1<<CLK);
-	}
+void delay_ms(unsigned int d) {
+	_delay_ms(d);
+}
+
+void spi_out(uint16_t data){
+	PORTB &= ~(1<<CS);				//enable slave device
+	SPDR = (data>>8);				//start transmission
+	while(!(SPSR & (1<<SPIF)));		//wait transfer finish
+	SPDR = (data & 0xFF);			//start transmission
+	while(!(SPSR & (1<<SPIF)));		//wait transfer finish
+	PORTB |= (1<<CS);				//disable slave device
+	delay_ms(1);					//datasheet says to wait a little
 }
 
 void monitor_buttons(void) {
@@ -123,6 +159,7 @@ void monitor_buttons(void) {
 }
 
 void blink(void) {
-	// toggle the current location on and off
-	delay_us(600);
+	// toggle the current location on
+	delay_ms(10);
+	// toggle the current location off
 }
