@@ -43,6 +43,8 @@ void monitor_buttons(void);
 void blink(void);
 void spi_out(uint16_t);
 void init_LED(void);
+void toggleLed(void);
+void getState(void);
 
 // Needs to be re-organized according to circuit
 #define SELECT PIND2
@@ -58,6 +60,7 @@ void init_LED(void);
 // This will allow me to keep the state of the pointer
 // XOR with 1 using buff0-buff7 will toggle the current location
 int position[2] = {0, 0};
+int state = 1;
 
 uint16_t row1 = 0x0800;
 uint16_t row2 = 0x0700;
@@ -83,8 +86,7 @@ int main (void)
 	
 	// Send test data for now
 	//spi_out(0x0FFF);
-	spi_out(row8 | 0x1);
-
+	//spi_out(row8 | 0x1);
 	while(1){
 		monitor_buttons();
 	}
@@ -112,7 +114,7 @@ void init_LED(void) {
 	// Remove the device from shutdown mode
 	spi_out(0x0C01);
 	
-	delay_ms(1);
+	spi_out(row1);
 }
 
 void delay_ms(unsigned int d) {
@@ -130,28 +132,86 @@ void spi_out(uint16_t data){
 }
 
 void monitor_buttons(void) {
-	 if(PINB&(1<<SELECT)) {
+	if(PIND&(1<<SELECT)) {
 		 // check for long press
-		 
+		 delay_ms(100);
+		 if(PIND&(1<<SELECT)) {
+			 delay_ms(100);
+			 if(PIND&(1<<SELECT)) {
+				 delay_ms(100);
+				if(PIND&(1<<SELECT)) {
+					delay_ms(100);
+					if(PIND&(1<<SELECT)) {
+						delay_ms(100);
+						if(PIND&(1<<SELECT)) {
+							// If you make it this deep, then it was a long press.
+							// Press all direction buttons at the same time to exit infinite loop
+							while(!(PIND&(1<<UP)) | !(PIND&(1<<DOWN)) | !(PIND&(1<<LEFT)) | !(PIND&(1<<RIGHT))){}
+						} else {delay_ms(100);} // Making up delays after if statements
+					} else {delay_ms(200);}
+				} else {delay_ms(300);}
+			 }else {delay_ms(400);}
+		 }
 		 // Else toggle current bit
-		 
-		 blink();
+		 if(state == 1) {
+			 state = 0;
+		 } else {
+			 state = 1;
+		 }
 	 }
-	else if(PINB&(1<<UP)) {
-		// Move the cursor up
-		blink();
+	else if(PIND&(1<<UP)) {
+		if(!(state == 1)) {
+			toggleLed();
+		}
+		// move the cursor up
+		position[1] = (position[1] - 1);
+		if (position[1] < 0) {
+			position[1] += 8;
+		}
+		getState();
+		if(!(state == 1)) {
+			toggleLed();
+		}
+		delay_ms(500);
 	} 
-	else if(PINB&(1<<DOWN)) {
-		// Move the cursor up
-		blink();
+	else if(PIND&(1<<DOWN)) {
+		// Move the cursor down
+		if(!(state == 1)) {
+			toggleLed();
+		}
+		position[1] = (position[1] + 1) % 8;
+		getState();
+		if(!(state == 1)) {
+			toggleLed();
+		}
+		delay_ms(500);
 	}
-	else if(PINB&(1<<LEFT)) {
+	else if(PIND&(1<<LEFT)) {
+		if(!(state == 1)) {
+			toggleLed();
+		}
 		// Move the cursor left
-		blink();
+		position[0] = (position[0] - 1);
+		if (position[0] < 0) {
+			position[0] += 8;
+		}
+		getState();
+		if(!(state == 1)) {
+			toggleLed();
+		}
+		delay_ms(500);
 	}
-	else if(PINB&(1<<RIGHT)) {
+	else if(PIND&(1<<RIGHT)) {
+		if(!(state == 1)) {
+			toggleLed();
+		}
 		// Move the cursor right
-		blink();
+		position[0] = (position[0] + 1) % 8;
+		getState();
+		if(!(state == 1)) {
+			toggleLed();
+		}
+		delay_ms(500);
 	}
 	else {
 		blink();
@@ -159,7 +219,138 @@ void monitor_buttons(void) {
 }
 
 void blink(void) {
-	// toggle the current location on
-	delay_ms(10);
-	// toggle the current location off
+	toggleLed();
+	delay_ms(250);
+	toggleLed();
+	delay_ms(250);
+}
+
+void toggleLed(void) {
+	switch(position[1]) {
+		case 0:
+			if(row1&(1<<position[0])) {
+				row1 &= ~(1<<position[0]);
+			} else {
+				row1 |= (1<<position[0]);
+			}
+			spi_out(row1);
+			break;
+		case 1:
+			if(row2&(1<<position[0])) {
+				row2 &= ~(1<<position[0]);
+			} else {
+				row2 |= (1<<position[0]);
+			}
+			spi_out(row2);
+			break;
+		case 2:
+			if(row3&(1<<position[0])) {
+				row3 &= ~(1<<position[0]);
+			} else {
+				row3 |= (1<<position[0]);
+			}
+			spi_out(row3);
+			break;
+		case 3:
+			if(row4&(1<<position[0])) {
+				row4 &= ~(1<<position[0]);
+			} else {
+				row4 |= (1<<position[0]);
+			}
+			spi_out(row4);
+			break;
+		case 4:
+			if(row5&(1<<position[0])) {
+				row5 &= ~(1<<position[0]);
+			} else {
+				row5 |= (1<<position[0]);
+			}
+			spi_out(row5);
+			break;
+		case 5:
+			if(row6&(1<<position[0])) {
+				row6 &= ~(1<<position[0]);
+			} else {
+				row6 |= (1<<position[0]);
+			}
+			spi_out(row6);
+			break;
+		case 6:
+			if(row7&(1<<position[0])) {
+				row7 &= ~(1<<position[0]);
+			} else {
+				row7 |= (1<<position[0]);
+			}
+			spi_out(row7);
+			break;
+		case 7:
+			if(row8&(1<<position[0])) {
+				row8 &= ~(1<<position[0]);
+			} else {
+				row8 |= (1<<position[0]);
+			}
+			spi_out(row8);
+			break;
+	}
+}
+
+void getState(void) {
+	switch(position[1]) {
+		case 0:
+			if(row1&(1<<position[0])) {
+				state = 1;
+			} else {
+				state = 0;
+			}
+			break;
+		case 1:
+			if(row2&(1<<position[0])) {
+				state = 1;
+			} else {
+				state = 0;
+			}
+			break;
+		case 2:
+			if(row3&(1<<position[0])) {
+				state = 1;
+			} else {
+				state = 0;
+			}
+			break;
+		case 3:
+			if(row4&(1<<position[0])) {
+				state = 1;
+			} else {
+				state = 0;
+			}
+			break;
+		case 4:
+			if(row5&(1<<position[0])) {
+				state = 1;
+			} else {
+				state = 0;
+			}
+			break;
+		case 5:
+			if(row6&(1<<position[0])) {
+				state = 1;
+			} else {
+				state = 0;
+			}
+			break;
+		case 6:
+			if(row7&(1<<position[0])) {
+				state = 1;
+			} else {
+				state = 0;
+			}
+			break;
+		case 7:
+			if(row8&(1<<position[0])) {
+				state = 1;
+			} else {
+				state = 0;
+			}
+			break;
+	}
 }
